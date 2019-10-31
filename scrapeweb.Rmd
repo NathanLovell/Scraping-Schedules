@@ -3,6 +3,7 @@ title: "Web Scrape"
 output: html_notebook
 ---
 
+First we add/install the needed Libraries.
 
 ```{r, results='hide', message=FALSE}
 include <- function(library_name){
@@ -13,18 +14,27 @@ include <- function(library_name){
 include("rvest")
 include("tidyr")
 include("dplyr")
+include("stringr")
 ```
 
 
-```{r}
+I have created this function that, provided a url, will scrape all classes on that page. It will take title, subject, class number, section number, instructor, current enrollment, semester, and year. It then creates a tibble out of the resulting data.
+
+```{r, message=FALSE, results='hide'}
 read_class_schedule <- function(url) {
+  ##Read the url
   schedule_html <- read_html(url)
   
-  title <- schedule_html %>% html_node(".subjpagessubjheader")
-              %>% html_text()
+  ##Find the title, do a first pass to extract usefull data
+  title <- schedule_html %>% html_node(".subjpagessubjheader") %>% html_text()
+  first_pass <- str_extract(title, "- .*T")
+  ##Extract semester and year from first pass
+  semester <- str_extract(first_pass, "[A-z]{3,}")
+  year <- str_extract(first_pass, "[0-9]{4}")
   
-  classes <- schedule_html %>% html_nodes(".classrow")
-
+  ##Find all rows with tr
+  classes <- schedule_html %>% html_nodes("tr")
+  ##Find each variable and stores it into a list
   class_title <- classes %>%
                 html_nodes("td.title") %>%
                 html_text()
@@ -43,11 +53,14 @@ read_class_schedule <- function(url) {
   enrollment <- classes %>%
                 html_nodes("td.enrtot") %>%
                 html_text()
-
-  tibble(class_title, class_subject, class_number,section_number, instructor, enrollment)
   
+  ##Take each list and make it a column in a tibble
+  tibble(class_title, class_subject, class_number,section_number, instructor, enrollment, semester, year)
 }
+```
 
+We then call this function and save the resulting tibble into a variable.
+```{r}
 url <- "http://ems.csuchico.edu/APSS/schedule/spr2019/CSCI.shtml"
 CSCI_spring_2019 <- read_class_schedule(url)
 url <- "http://ems.csuchico.edu/APSS/schedule/spr2020/CSCI.shtml"
@@ -56,8 +69,10 @@ url <- "http://ems.csuchico.edu/APSS/schedule/spr2019/MATH.shtml"
 MATH_spring_2019 <- read_class_schedule(url)
 url <- "http://ems.csuchico.edu/APSS/schedule/spr2020/MATH.shtml"
 MATH_spring_2020 <- read_class_schedule(url)
+```
 
-
+After each webpage has been scraped, we combine them all into a single tibble in order to make our observations.
+```{r}
 all_classes <- bind_rows(CSCI_spring_2019, CSCI_spring_2020, MATH_spring_2019, MATH_spring_2020)
 ```
 
